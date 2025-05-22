@@ -6,25 +6,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
-from io import BytesIO
+from io import TextIOWrapper
 
-st.set_page_config(page_title="CSV from ZIP (Analyzer)", layout="wide")
-
-st.title("📦 CSV from ZIP Analyzer with ETL")
+st.set_page_config(page_title="Stream-Safe ZIP CSV Viewer", layout="wide")
+st.title("📦 Stream-Safe CSV from ZIP Analyzer")
 st.markdown("""
-Upload a `.zip` file with one or more large `.csv` files.  
-This version includes error-tolerant loading (ETL) and cleanup.
+Upload a `.zip` file containing large `.csv` files. This version reads a sample portion 
+of the CSV **line-by-line** for stability on Streamlit Cloud.
 """)
-
-def clean_dataframe(df):
-    # Try to convert all columns that look numeric
-    for col in df.columns:
-        try:
-            df[col] = pd.to_numeric(df[col], errors='ignore')
-        except Exception:
-            pass
-    df.columns = df.columns.str.strip()
-    return df
 
 uploaded_zip = st.file_uploader("Upload ZIP file", type='zip')
 
@@ -34,54 +23,42 @@ if uploaded_zip:
         st.success(f"Uploaded ZIP size: {zip_size_mb} MB")
 
         with zipfile.ZipFile(uploaded_zip) as z:
-            file_list = z.namelist()
-            csv_files = [f for f in file_list if f.endswith('.csv')]
+            csv_files = [f for f in z.namelist() if f.endswith('.csv')]
 
             if not csv_files:
                 st.warning("No CSV files found in ZIP.")
             else:
-                selected_csv = st.selectbox("📁 Select a CSV file to load", csv_files)
-                file_info = z.getinfo(selected_csv)
-                size_mb = round(file_info.file_size / (1024**2), 2)
-                st.caption(f"Selected file size: {size_mb} MB")
+                selected_csv = st.selectbox("📁 Select a CSV file", csv_files)
 
-                try:
-                    with z.open(selected_csv) as f:
-                        df = pd.read_csv(f, on_bad_lines='skip', encoding_errors='ignore')
+                with z.open(selected_csv) as f:
+                    st.caption("Reading first 1000 lines for safe preview...")
+                    wrapper = TextIOWrapper(f, encoding='utf-8', errors='ignore')
+                    df = pd.read_csv(wrapper, nrows=1000)
 
-                    df = clean_dataframe(df)
+                    df.columns = df.columns.str.strip()
+                    st.dataframe(df.head(50))
+                    st.write("Shape:", df.shape)
 
-                    st.subheader("📊 Data Preview")
-                    st.dataframe(df.head(100))
+                    if not df.empty:
+                        st.write("🔢 Summary")
+                        st.write(df.describe(include='all'))
 
-                    st.subheader("🔢 Data Summary")
-                    st.write(df.describe(include='all'))
-
-                    st.subheader("📌 Column Types")
-                    st.write(df.dtypes)
-
-                    st.subheader("📈 Quick Visualizations")
-                    numeric_cols = df.select_dtypes(include='number').columns.tolist()
-
-                    if numeric_cols:
-                        col1, col2 = st.columns(2)
-
-                        with col1:
-                            selected_hist_col = st.selectbox("Histogram: select numeric column", numeric_cols, key='hist')
-                            fig1, ax1 = plt.subplots()
-                            sns.histplot(df[selected_hist_col].dropna(), kde=True, ax=ax1)
-                            st.pyplot(fig1)
-
-                        with col2:
-                            if len(numeric_cols) >= 2:
-                                selected_x = st.selectbox("Scatter X", numeric_cols, key='x')
-                                selected_y = st.selectbox("Scatter Y", numeric_cols, key='y')
-                                fig2, ax2 = plt.subplots()
-                                sns.scatterplot(data=df, x=selected_x, y=selected_y, ax=ax2)
-                                st.pyplot(fig2)
-                    else:
-                        st.info("No numeric columns available for plotting.")
-                except Exception as e:
-                    st.error(f"⚠️ Failed during ETL or plotting: {e}")
-    except zipfile.BadZipFile:
-        st.error("❌ Not a valid ZIP file. Please upload a valid ZIP archive.")
+                        numeric_cols = df.select_dtypes(include='number').columns.tolist()
+                        if numeric_cols:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                selected_col = st.selectbox("📊 Histogram Column", numeric_cols)
+                                fig, ax = plt.subplots()
+                                sns.histplot(df[selected_col].dropna(), kde=True, ax=ax)
+                                st.pyplot(fig)
+                            with col2:
+                                if len(numeric_cols) >= 2:
+                                    x_col = st.selectbox("X Axis", numeric_cols, index=0)
+                                    y_col = st.selectbox("Y Axis", numeric_cols, index=1)
+                                    fig2, ax2 = plt.subplots()
+                                    sns.scatterplot(data=df, x=x_col, y=y_col, ax=ax2)
+                                    st.pyplot(fig2)
+                        else:
+                            st.info("No numeric data for visualization.")
+    except Exception as e:
+        st.error(f"App failed with error: {e}")
