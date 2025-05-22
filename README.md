@@ -1,6 +1,7 @@
-# Shaker Dashboard with Smart Column Detection
+# Crash-Proof Shaker Dashboard
 
-This version includes:
-- Auto-detection of timestamp and load columns
-- Fallback protection to avoid crashes
-- Full merged shaker CSV analysis from ZIP
+Includes:
+- Smart detection of time/load/depth columns
+- Numeric and datetime validation
+- Safe fallbacks to prevent hard crashes
+- Merged data, charting, drop flags, and efficiency
