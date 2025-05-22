@@ -1,8 +1,7 @@
-# Real-Time Shaker Monitoring Dashboard
+# Shaker Dashboard with Auto Merge + Sensor-Based Metrics
 
-Streamlit dashboard to monitor shaker performance with:
-- File upload + size display
-- Summary stats
-- Drop detection flags
-- Screen life, utilization, anomaly warning
-- Tabs: Charts, Flags, Efficiency, Raw Data
+Features:
+- Upload ZIP of shaker CSVs
+- Automatically detect and merge all shaker files
+- Calculate depth drilled, screen utilization, shaker load
+- Anomaly detection, interactive charting, efficiency pie

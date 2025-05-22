@@ -1,11 +1,13 @@
 
 import streamlit as st
+import zipfile
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-from io import StringIO
+from io import TextIOWrapper
+import os
 
-st.set_page_config(page_title="Real-Time Shaker Dashboard", layout="wide")
+st.set_page_config(page_title="Shaker Dashboard - Auto Merge + Sensors", layout="wide")
 
 # === Sidebar Controls ===
 st.sidebar.image("assets/Prodigy_IQ_logo.png", width=180)
@@ -15,59 +17,72 @@ st.sidebar.image("assets/shaker_unit.png", caption="Hyperpool Shaker Unit", use_
 selected_date = st.sidebar.date_input("Select Date to View Performance", value=datetime.today())
 
 # === Upload Section ===
-st.title("🛠 Real-Time Shaker Monitoring Dashboard")
-uploaded_file = st.file_uploader("📤 Upload Shaker CSV Data", type=['csv'])
+st.title("🔄 Auto-Merged Real-Time Shaker Dashboard")
+uploaded_zip = st.file_uploader("📤 Upload ZIP of Shaker CSVs", type=['zip'])
 
-if uploaded_file:
-    size_mb = round(len(uploaded_file.getvalue()) / (1024**2), 2)
-    st.caption(f"Uploaded file: **{uploaded_file.name}**, Size: **{size_mb} MB**")
+if uploaded_zip:
+    size_mb = round(len(uploaded_zip.getvalue()) / (1024**2), 2)
+    st.caption(f"Uploaded: **{uploaded_zip.name}**, Size: **{size_mb} MB**")
 
     try:
-        df = pd.read_csv(uploaded_file, on_bad_lines='skip', encoding_errors='ignore')
-        df.columns = df.columns.str.strip()
+        with zipfile.ZipFile(uploaded_zip, 'r') as z:
+            csv_files = [f for f in z.namelist() if f.endswith('.csv')]
+            if not csv_files:
+                st.error("No CSV files found in ZIP.")
+            else:
+                all_dfs = []
+                for file_name in csv_files:
+                    with z.open(file_name) as f:
+                        df = pd.read_csv(TextIOWrapper(f, encoding='utf-8', errors='ignore'), on_bad_lines='skip')
+                        df.columns = df.columns.str.strip()
+                        df['ShakerUnit'] = os.path.basename(file_name).split('.')[0]
+                        all_dfs.append(df)
 
-        # Convert timestamp if present
-        if 'Timestamp' in df.columns:
-            df['Timestamp'] = pd.to_datetime(df['Timestamp'], errors='coerce')
+                df_all = pd.concat(all_dfs, ignore_index=True)
 
-        # Example columns expected
-        load_col = [col for col in df.columns if "Load" in col or "Shaker" in col]
-        depth_drilled = 11437
-        screen_life_hrs = 118.9
-        shaker_load_pct = df[load_col[0]].mean() if load_col else -23.7
-        screen_util_pct = 3.7
+                # Timestamp conversion
+                if 'Timestamp' in df_all.columns:
+                    df_all['Timestamp'] = pd.to_datetime(df_all['Timestamp'], errors='coerce')
 
-        # === Summary Cards ===
-        st.subheader("📊 Summary: Drilling & Shaker Overview")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("📏 Depth Drilled (ft)", f"{depth_drilled:,}")
-        col2.metric("📉 Shaker Load", f"{shaker_load_pct:.1f}%", delta="-32.9→27.2%")
-        col3.metric("🧪 Screen Utilization", f"{screen_util_pct:.1f}%", delta="-10.8→11.9%")
-        st.warning("🔴 Shaker load anomalies detected — check for mechanical issues or data errors.")
+                # Custom metric extraction
+                depth_col = next((c for c in df_all.columns if 'Depth' in c and 'Bit' in c), None)
+                load_col = next((c for c in df_all.columns if 'Load' in c or 'Shaker' in c), None)
 
-        # === Tabs ===
-        tab1, tab2, tab3, tab4 = st.tabs(["📈 Charts", "🔻 Drop Flags", "📊 Efficiency", "📂 Raw Data"])
+                depth_drilled = int(df_all[depth_col].max()) if depth_col else 0
+                shaker_load = round(df_all[load_col].mean(), 2) if load_col else -999
+                screen_life_hrs = round((200 - shaker_load) * 0.8, 1) if shaker_load != -999 else 0
+                screen_util_pct = round((shaker_load / 100) * threshold, 2) if shaker_load != -999 else 0
 
-        with tab1:
-            st.subheader("Shaker Output")
-            st.caption(f"{load_col[0]} - Last 1000 Points")
-            fig = px.line(df.tail(1000), x='Timestamp', y=load_col[0], title="Shaker Load Over Time")
-            st.plotly_chart(fig, use_container_width=True)
+                st.subheader("📊 Aggregated Metrics from Sensors")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("📏 Depth Drilled (ft)", f"{depth_drilled:,}")
+                col2.metric("📉 Shaker Load", f"{shaker_load:.1f}%", delta="-")
+                col3.metric("🧪 Screen Utilization", f"{screen_util_pct:.1f}%", delta="-")
 
-        with tab2:
-            st.subheader("🔍 Shaker Drop Detection Flags")
-            df['DropFlag'] = (df[load_col[0]].diff().abs() > 5).astype(int)
-            fig = px.scatter(df, x='Timestamp', y=load_col[0], color=df['DropFlag'].map({0: "Normal", 1: "Drop"}))
-            st.plotly_chart(fig, use_container_width=True)
+                st.warning("🔴 System-wide anomaly detection activated — auto-flagging enabled.")
 
-        with tab3:
-            st.subheader("🧮 Solids Removal Efficiency")
-            fig = px.pie(values=[screen_util_pct, 100 - screen_util_pct], names=['Utilized', 'Losses'])
-            st.plotly_chart(fig, use_container_width=True)
+                tab1, tab2, tab3, tab4 = st.tabs(["📈 Charts", "🔻 Drop Flags", "📊 Efficiency", "📂 Raw Data"])
 
-        with tab4:
-            st.subheader("📂 Raw Data")
-            st.dataframe(df.head(200))
+                with tab1:
+                    st.subheader("Shaker Load Over Time")
+                    fig = px.line(df_all.tail(1000), x='Timestamp', y=load_col, color='ShakerUnit')
+                    st.plotly_chart(fig, use_container_width=True)
 
+                with tab2:
+                    st.subheader("Anomaly Drop Detection")
+                    df_all['DropFlag'] = (df_all[load_col].diff().abs() > 5).astype(int)
+                    fig = px.scatter(df_all, x='Timestamp', y=load_col, color='DropFlag', symbol='ShakerUnit')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with tab3:
+                    st.subheader("Screen Utilization Efficiency")
+                    fig = px.pie(values=[screen_util_pct, 100 - screen_util_pct],
+                                 names=['Utilized', 'Losses'],
+                                 title="Solids Removal Efficiency")
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with tab4:
+                    st.subheader("Raw Merged Data Sample")
+                    st.dataframe(df_all.head(200))
     except Exception as e:
-        st.error(f"Error processing file: {e}")
+        st.error(f"Error processing ZIP: {e}")
