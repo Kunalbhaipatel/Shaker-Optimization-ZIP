@@ -1,1 +1,1 @@
-Polished shaker dashboard with all enhancements: toggled preview, unified layout, tabbed summary, icons.
+Final dashboard with safe filters and animation during file processing or filter changes.
