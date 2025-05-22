@@ -1,1 +1,1 @@
-Final smart shaker dashboard with vertical charts, daily summary, export, and smart timestamp parsing.
+Smart shaker dashboard with color-coded summary, dynamic advice, and visual improvements.
