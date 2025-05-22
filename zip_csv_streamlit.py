@@ -7,14 +7,14 @@ from io import TextIOWrapper
 import numpy as np
 import os
 
-st.set_page_config(page_title="Enhanced Shaker Dashboard", layout="wide")
+st.set_page_config(page_title="📈 Shaker Dashboard Pro", layout="wide")
+st.markdown("<h1 style='text-align: center;'>🛠️ Prodigy Shaker Performance Dashboard</h1>", unsafe_allow_html=True)
+
 st.sidebar.image("assets/Prodigy_IQ_logo.png", width=180)
-threshold = st.sidebar.slider("Utilization Threshold (%)", 50, 100, 80)
+threshold = st.sidebar.slider("🎯 Utilization Threshold (%)", 50, 100, 80)
 st.sidebar.image("assets/shaker_unit.png", caption="Hyperpool Shaker Unit", use_column_width=True)
 
-st.title("📊 Enhanced Smart Shaker Dashboard")
-
-uploaded_zip = st.file_uploader("Upload ZIP with shaker CSVs", type=["zip"])
+uploaded_zip = st.file_uploader("📤 Upload a ZIP file containing shaker CSVs", type=["zip"])
 
 def detect_column(columns, keywords):
     for col in columns:
@@ -34,9 +34,9 @@ def try_parse_formats(series, formats):
 
 def color_load(val):
     if val > 80:
-        return "background-color: #ffa3a3"  # red
+        return "background-color: #ffa3a3"
     elif val < 30:
-        return "background-color: #a3d5ff"  # blue
+        return "background-color: #a3d5ff"
     return ""
 
 def color_util(val):
@@ -73,9 +73,9 @@ if uploaded_zip:
                 st.dataframe(df_all.head(10))
                 st.stop()
 
-            preview = df_all[time_col].dropna().astype(str).unique()[:5]
-            st.markdown(f"🔍 **Preview from `{time_col}`**:")
-            st.write(preview)
+            with st.expander("🧪 Show Timestamp Preview"):
+                st.caption(f"First 5 values from `{time_col}`:")
+                st.write(df_all[time_col].dropna().astype(str).unique()[:5])
 
             formats = ["%Y/%m/%d", "%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y"]
             parsed, detected_fmt = try_parse_formats(df_all[time_col], formats)
@@ -104,12 +104,12 @@ if uploaded_zip:
             daily_summary['Screen_Utilization'] = (daily_summary['Avg_Shaker_Load'] / 100 * threshold).round(2)
 
             valid_dates = sorted(df_all['Date'].dropna().unique())
-            selected_date = st.sidebar.selectbox("Select Date", valid_dates[::-1],
+            selected_date = st.sidebar.selectbox("📅 Select a Date", valid_dates[::-1],
                                                  format_func=lambda d: d.strftime("%Y-%m-%d"))
-            df_day = df_all[df_all['Date'] == selected_date]
 
+            df_day = df_all[df_all['Date'] == selected_date]
             if df_day.empty:
-                st.warning("No data for selected date.")
+                st.warning("⚠️ No data for selected date.")
                 st.stop()
 
             depth_val = int(df_day[depth_col].max()) if depth_col else len(df_day)
@@ -118,51 +118,56 @@ if uploaded_zip:
             screen_life_remaining = round((100 - screen_util_pct) * 1.5, 1)
 
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Depth", f"{depth_val}")
-            col2.metric("Avg Load", f"{shaker_load:.1f}%")
-            col3.metric("Utilization", f"{screen_util_pct:.1f}%")
-            col4.metric("Est. Screen Life (hrs)", f"{screen_life_remaining}")
+            col1.metric("📏 Depth", f"{depth_val}")
+            col2.metric("📉 Load", f"{shaker_load:.1f}%")
+            col3.metric("🧪 Utilization", f"{screen_util_pct:.1f}%")
+            col4.metric("⏳ Life Left (hrs)", f"{screen_life_remaining}")
 
             df_day['Depth_Index'] = range(len(df_day))
 
-            tab1, tab2, tab3, tab4 = st.tabs(["Vertical View", "Drop Flags", "Efficiency", "Raw Data"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "📈 Vertical View", "🔻 Drop Flags", "🥧 Efficiency", "📂 Raw Data", "📊 Summary Report"
+            ])
 
             with tab1:
                 fig = px.line(df_day.tail(1000), y='Depth_Index', x=load_col, color='ShakerUnit', orientation='h',
-                              title="Shaker Load vs Depth")
+                              title="Shaker Load by Depth (Vertical Layout)")
                 st.plotly_chart(fig, use_container_width=True)
-
-                st.info("📌 Recommendation: If shaker load rises sharply with depth, check for overfeeding or improper flow control.")
+                if shaker_load > 80:
+                    st.warning("⚠️ Load increases with depth — check mud flow rate or screen tension.")
+                else:
+                    st.success("✅ Load profile appears stable.")
 
             with tab2:
                 df_day['DropFlag'] = (df_day[load_col].diff().abs() > 5).astype(int)
                 fig = px.scatter(df_day, y='Depth_Index', x=load_col,
                                  color=df_day['DropFlag'].map({0: "Normal", 1: "Drop"}))
                 st.plotly_chart(fig, use_container_width=True)
-                drop_rate = df_day['DropFlag'].sum()
-                if drop_rate > 25:
-                    st.warning("⚠️ Frequent drops detected — check for screen tension or erratic mud feed.")
+                if df_day['DropFlag'].sum() > 20:
+                    st.warning("🔧 Frequent drops detected — recheck screen clamping or mud consistency.")
                 else:
-                    st.success("✅ Load trend appears stable.")
+                    st.info("🟢 Low drop rate.")
 
             with tab3:
-                fig = px.pie(values=[screen_util_pct, 100 - screen_util_pct], names=['Utilized', 'Losses'])
+                fig = px.pie(values=[screen_util_pct, 100 - screen_util_pct],
+                             names=["Utilized", "Unused"],
+                             title="Solids Removal Efficiency")
                 st.plotly_chart(fig, use_container_width=True)
                 if screen_util_pct > 80:
-                    st.warning("⚠️ High utilization — inspect screen condition soon.")
+                    st.warning("🔍 Screen nearly saturated — consider replacement soon.")
                 elif screen_util_pct < 30:
-                    st.info("ℹ️ Low utilization — may indicate bypass or screen clog.")
+                    st.info("ℹ️ Low screen usage — check bypass flow or screen type.")
 
             with tab4:
                 st.dataframe(df_day.head(200))
 
-            st.subheader("📅 Daily Summary Table with Highlights")
-            styled = daily_summary.style.applymap(color_load, subset=["Avg_Shaker_Load"])\
-                                           .applymap(color_util, subset=["Screen_Utilization"])
-            st.dataframe(styled)
-
-            csv_data = daily_summary.to_csv(index=False).encode("utf-8")
-            st.download_button("📤 Export Summary as CSV", csv_data, "daily_summary.csv", "text/csv")
+            with tab5:
+                st.subheader("📅 Summary Report Table")
+                styled = daily_summary.style.applymap(color_load, subset=["Avg_Shaker_Load"])\
+                                             .applymap(color_util, subset=["Screen_Utilization"])
+                st.dataframe(styled, use_container_width=True)
+                csv_data = daily_summary.to_csv(index=False).encode("utf-8")
+                st.download_button("📤 Download Summary", csv_data, "daily_summary.csv", "text/csv")
 
     except Exception as e:
         st.error(f"🔥 Error: {e}")
