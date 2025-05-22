@@ -2,25 +2,44 @@
 import streamlit as st
 import zipfile
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
 from io import TextIOWrapper
+from PIL import Image
+import os
 
-st.set_page_config(page_title="Stream-Safe ZIP CSV Viewer", layout="wide")
-st.title("📦 Stream-Safe CSV from ZIP Analyzer")
+# === Page Configuration ===
+st.set_page_config(page_title="Unified Shaker ETL Dashboard", layout="wide")
+
+# === Load Logo ===
+logo_path = "assets/Prodigy_IQ_logo.png"
+if os.path.exists(logo_path):
+    st.image(logo_path, width=250)
+
+st.title("🛠 Unified Shaker Data Analyzer")
 st.markdown("""
-Upload a `.zip` file containing large `.csv` files. This version reads a sample portion 
-of the CSV **line-by-line** for stability on Streamlit Cloud.
+This dashboard previews and analyzes multiple shaker CSV files inside a `.zip` archive.  
+Supports full ETL processing with interactive charts and unified summaries.
 """)
 
-uploaded_zip = st.file_uploader("Upload ZIP file", type='zip')
+# === ETL Loader Function ===
+def load_and_clean_csv(file, full=False):
+    try:
+        wrapper = TextIOWrapper(file, encoding='utf-8', errors='ignore')
+        df = pd.read_csv(wrapper, on_bad_lines='skip') if full else pd.read_csv(wrapper, nrows=1000)
+        df.columns = df.columns.str.strip()
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='ignore')
+        return df
+    except Exception as e:
+        st.error(f"❌ Failed to load CSV: {e}")
+        return pd.DataFrame()
+
+uploaded_zip = st.file_uploader("📂 Upload ZIP file containing shaker CSVs", type='zip')
 
 if uploaded_zip:
     try:
-        zip_size_mb = round(len(uploaded_zip.getvalue()) / (1024**2), 2)
-        st.success(f"Uploaded ZIP size: {zip_size_mb} MB")
+        zip_size = round(len(uploaded_zip.getvalue()) / (1024**2), 2)
+        st.success(f"✅ Uploaded ZIP: {zip_size} MB")
 
         with zipfile.ZipFile(uploaded_zip) as z:
             csv_files = [f for f in z.namelist() if f.endswith('.csv')]
@@ -28,37 +47,39 @@ if uploaded_zip:
             if not csv_files:
                 st.warning("No CSV files found in ZIP.")
             else:
-                selected_csv = st.selectbox("📁 Select a CSV file", csv_files)
+                st.info(f"Found {len(csv_files)} shaker files: {csv_files}")
 
-                with z.open(selected_csv) as f:
-                    st.caption("Reading first 1000 lines for safe preview...")
-                    wrapper = TextIOWrapper(f, encoding='utf-8', errors='ignore')
-                    df = pd.read_csv(wrapper, nrows=1000)
+                all_dfs = []
+                for csv_file in csv_files:
+                    with z.open(csv_file) as f:
+                        df = load_and_clean_csv(f, full=True)
+                        df['ShakerSource'] = os.path.basename(csv_file).split('.')[0]
+                        all_dfs.append(df)
 
-                    df.columns = df.columns.str.strip()
-                    st.dataframe(df.head(50))
-                    st.write("Shape:", df.shape)
+                if all_dfs:
+                    df_all = pd.concat(all_dfs, ignore_index=True)
+                    st.subheader("🔍 Combined Shaker Data Overview")
+                    st.dataframe(df_all.head(50))
+                    st.write("📊 Summary")
+                    st.write(df_all.describe(include='all'))
 
-                    if not df.empty:
-                        st.write("🔢 Summary")
-                        st.write(df.describe(include='all'))
+                    numeric_cols = df_all.select_dtypes(include='number').columns.tolist()
+                    if numeric_cols:
+                        st.subheader("📈 Interactive Visualizations")
+                        col1, col2 = st.columns(2)
 
-                        numeric_cols = df.select_dtypes(include='number').columns.tolist()
-                        if numeric_cols:
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                selected_col = st.selectbox("📊 Histogram Column", numeric_cols)
-                                fig, ax = plt.subplots()
-                                sns.histplot(df[selected_col].dropna(), kde=True, ax=ax)
-                                st.pyplot(fig)
-                            with col2:
-                                if len(numeric_cols) >= 2:
-                                    x_col = st.selectbox("X Axis", numeric_cols, index=0)
-                                    y_col = st.selectbox("Y Axis", numeric_cols, index=1)
-                                    fig2, ax2 = plt.subplots()
-                                    sns.scatterplot(data=df, x=x_col, y=y_col, ax=ax2)
-                                    st.pyplot(fig2)
-                        else:
-                            st.info("No numeric data for visualization.")
+                        with col1:
+                            hist_col = st.selectbox("Histogram Column", numeric_cols)
+                            fig = px.histogram(df_all, x=hist_col, color='ShakerSource', nbins=50, title=f"{hist_col} Distribution")
+                            st.plotly_chart(fig, use_container_width=True)
+
+                        with col2:
+                            if len(numeric_cols) >= 2:
+                                x = st.selectbox("Scatter X", numeric_cols, index=0)
+                                y = st.selectbox("Scatter Y", numeric_cols, index=1)
+                                fig2 = px.scatter(df_all, x=x, y=y, color='ShakerSource', title=f"{x} vs {y}")
+                                st.plotly_chart(fig2, use_container_width=True)
+                    else:
+                        st.info("No numeric columns available for plotting.")
     except Exception as e:
         st.error(f"App failed with error: {e}")

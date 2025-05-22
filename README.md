@@ -1,4 +1,7 @@
-# Stream-Safe ZIP CSV Analyzer
+# Unified Shaker ETL Dashboard
 
-This Streamlit app loads large CSVs inside ZIP archives by reading only the first 1000 rows.
-It is designed to be stable and lightweight for platforms like Streamlit Cloud.
+This app allows you to upload a ZIP containing multiple shaker data CSV files, and:
+- Aggregates them into a single table
+- Cleans and processes the data
+- Shows interactive charts (histograms, scatter) by shaker
+- Displays logo and consistent layout
