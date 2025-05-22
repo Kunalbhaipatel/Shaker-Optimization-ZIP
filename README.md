@@ -1,7 +1,7 @@
-# Shaker Dashboard with Summary Export and Recommendations
+# Unified Shaker Dashboard (Vertical + Date Filter + Summary Export)
 
 Features:
-- Daily summary of screen utilization, depth drilled, shaker load
-- CSV export button
-- Daily trend charts
-- Practical guidance for screen change timing and life optimization
+- Date filter with vertical time-depth-style charts
+- Daily summary table for load, depth, utilization
+- CSV export of summary
+- Recommendations for screen performance and life
