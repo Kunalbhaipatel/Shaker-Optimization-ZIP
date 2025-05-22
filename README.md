@@ -1,3 +1,7 @@
-# Shaker Dashboard (Vertical Layout + Date Filter)
-- Enables date filter only when timestamp data is present
-- Displays shaker performance in vertical layout (simulated depth)
+# Shaker Dashboard with Summary Export and Recommendations
+
+Features:
+- Daily summary of screen utilization, depth drilled, shaker load
+- CSV export button
+- Daily trend charts
+- Practical guidance for screen change timing and life optimization
