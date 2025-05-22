@@ -1,1 +1,1 @@
-Final shaker dashboard with vertical layout, fixed date filter, summary table, CSV export, and screen life tips.
+Final smart shaker dashboard with vertical charts, daily summary, export, and smart timestamp parsing.
