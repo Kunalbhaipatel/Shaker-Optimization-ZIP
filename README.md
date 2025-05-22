@@ -1,7 +1,6 @@
-# Shaker Dashboard with Auto Merge + Sensor-Based Metrics
+# Shaker Dashboard with Smart Column Detection
 
-Features:
-- Upload ZIP of shaker CSVs
-- Automatically detect and merge all shaker files
-- Calculate depth drilled, screen utilization, shaker load
-- Anomaly detection, interactive charting, efficiency pie
+This version includes:
+- Auto-detection of timestamp and load columns
+- Fallback protection to avoid crashes
+- Full merged shaker CSV analysis from ZIP
