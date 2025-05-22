@@ -1,7 +1,8 @@
-# Unified Shaker ETL Dashboard
+# Real-Time Shaker Monitoring Dashboard
 
-This app allows you to upload a ZIP containing multiple shaker data CSV files, and:
-- Aggregates them into a single table
-- Cleans and processes the data
-- Shows interactive charts (histograms, scatter) by shaker
-- Displays logo and consistent layout
+Streamlit dashboard to monitor shaker performance with:
+- File upload + size display
+- Summary stats
+- Drop detection flags
+- Screen life, utilization, anomaly warning
+- Tabs: Charts, Flags, Efficiency, Raw Data
