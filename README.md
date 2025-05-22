@@ -1,7 +1,3 @@
-# Crash-Proof Shaker Dashboard
-
-Includes:
-- Smart detection of time/load/depth columns
-- Numeric and datetime validation
-- Safe fallbacks to prevent hard crashes
-- Merged data, charting, drop flags, and efficiency
+# Shaker Dashboard (Vertical Layout + Date Filter)
+- Enables date filter only when timestamp data is present
+- Displays shaker performance in vertical layout (simulated depth)
