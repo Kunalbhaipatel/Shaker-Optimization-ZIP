@@ -1,1 +1,1 @@
-Final crash-proof shaker dashboard with summary export, vertical plots, and screen life recommendations.
+Final shaker dashboard with vertical layout, fixed date filter, summary table, CSV export, and screen life tips.
