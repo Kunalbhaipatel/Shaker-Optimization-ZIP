@@ -7,4 +7,4 @@ It extracts them in-memory, displays key stats, and provides interactive visuali
 - Upload ZIP file and select any CSV inside
 - Memory-safe: No server-side storage
 - Histogram and scatter plot explorer
-- Fully deployable to Streamlit Cloud
+- Fixed for Streamlit Cloud deployment
