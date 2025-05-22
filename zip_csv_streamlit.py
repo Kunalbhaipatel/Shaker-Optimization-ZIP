@@ -3,18 +3,28 @@ import streamlit as st
 import zipfile
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')  # Use non-GUI backend for Streamlit Cloud
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from io import BytesIO
 
 st.set_page_config(page_title="CSV from ZIP (Analyzer)", layout="wide")
 
-st.title("📦 CSV from ZIP Analyzer")
+st.title("📦 CSV from ZIP Analyzer with ETL")
 st.markdown("""
 Upload a `.zip` file with one or more large `.csv` files.  
-Choose which one to analyze. Fully in-memory, safe, and temporary.
+This version includes error-tolerant loading (ETL) and cleanup.
 """)
+
+def clean_dataframe(df):
+    # Try to convert all columns that look numeric
+    for col in df.columns:
+        try:
+            df[col] = pd.to_numeric(df[col], errors='ignore')
+        except Exception:
+            pass
+    df.columns = df.columns.str.strip()
+    return df
 
 uploaded_zip = st.file_uploader("Upload ZIP file", type='zip')
 
@@ -37,7 +47,9 @@ if uploaded_zip:
 
                 try:
                     with z.open(selected_csv) as f:
-                        df = pd.read_csv(f)
+                        df = pd.read_csv(f, on_bad_lines='skip', encoding_errors='ignore')
+
+                    df = clean_dataframe(df)
 
                     st.subheader("📊 Data Preview")
                     st.dataframe(df.head(100))
@@ -70,6 +82,6 @@ if uploaded_zip:
                     else:
                         st.info("No numeric columns available for plotting.")
                 except Exception as e:
-                    st.error(f"⚠️ Failed to read or process the CSV: {e}")
+                    st.error(f"⚠️ Failed during ETL or plotting: {e}")
     except zipfile.BadZipFile:
         st.error("❌ Not a valid ZIP file. Please upload a valid ZIP archive.")
